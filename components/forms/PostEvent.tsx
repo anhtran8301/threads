@@ -1,37 +1,29 @@
 "use client";
 
-import * as z from "zod";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useOrganization } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { usePathname, useRouter } from "next/navigation";
-
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-
-import { EventValidation, ThreadValidation } from "@/lib/validations/thread";
-import { createThread } from "@/lib/actions/thread.actions";
-import { Input } from "../ui/input";
+import { useOrganization,currentUser } from "@clerk/nextjs";
 import moment from "moment";
-import { CldUploadWidget } from "next-cloudinary";
 
+import { EventValidation } from "@/lib/validations/event";
+import { createEvent } from "@/lib/actions/event.actions";
+
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { CldUploadWidget } from "next-cloudinary";
+import z from "zod/lib";
 interface Props {
   userId: string;
 }
 
-function PostEvent({ userId }: Props) {
+const PostEvent: React.FC<Props> = ({ userId }) => {
   const router = useRouter();
-  const pathname = usePathname();
-
   const { organization } = useOrganization();
+  const [startDate, setStartDate] = useState<Date | null>(null);
 
   const form = useForm<z.infer<typeof EventValidation>>({
     resolver: zodResolver(EventValidation),
@@ -44,80 +36,153 @@ function PostEvent({ userId }: Props) {
       location: "",
       description: "",
       accountId: userId,
+      communityId: organization ? organization.id : "",
     },
   });
-
+  
   const onSubmit = async (values: z.infer<typeof EventValidation>) => {
-    await createThread({
-      text: values.eventName,
-      author: userId,
-      communityId: organization ? organization.id : null,
-      path: pathname,
-    });
-
-    router.push("/");
+    console.log(values)
+  //   const user = await currentUser();
+  //   if (!user) return null;
+  // console.log("goddddđ")
+  //   const path = "/events"; // Adjust path if needed
+  //   try {
+  //     await createEvent({
+  //       ...values,
+  //       communityId: organization ? organization.id : "",
+  //       author: user?.id,
+  //       path: path,
+  //     });
+  //     console.log("124125342534")
+  //   } catch (error) {
+  //     console.error("Error creating event:", error);
+  //   }
   };
-
+ 
   return (
     <Form {...form}>
-      <form
-        className="mt-10 flex flex-col justify-start gap-10"
-        onSubmit={form.handleSubmit(onSubmit)}
-      >
-        <CldUploadWidget signatureEndpoint="/api/sign-image">
-          {({ open }) => {
-            return (
-              <Button
-                type="submit"
-                className="bg-primary-500"
-                onClick={() => open()}
-              >
-                Upload an Image
-              </Button>
-            );
-          }}
-        </CldUploadWidget>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="mt-10 flex flex-col gap-10">
+        {/* <CldUploadWidget signatureEndpoint="/api/sign-image">
+          {({ open }) => (
+            <Button type="button" onClick={() => open()} className="bg-primary-500">
+              Upload Event Image
+            </Button>
+          )}
+        </CldUploadWidget> */}
+
         <FormField
           control={form.control}
           name="eventName"
           render={({ field }) => (
-            <FormItem className="flex w-full flex-col gap-3">
-              <FormLabel className="text-base-semibold text-light-2">
-                Tên sự kiện
-              </FormLabel>
+            <FormItem>
+              <FormLabel>Event Name</FormLabel>
               <FormControl>
-                <Input
-                  type="text"
-                  className="account-form_input no-focus"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem className="flex w-full flex-col gap-3">
-              <FormLabel className="text-base-semibold text-light-2">
-                Content
-              </FormLabel>
-              <FormControl className="no-focus border border-dark-4 bg-dark-3 text-light-1">
-                <Textarea rows={15} {...field} />
+                <Input type="text" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit" className="bg-primary-500">
-          Post Thread
-        </Button>
+        <FormField
+          control={form.control}
+          name="startDate"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Event Date</FormLabel>
+              <FormControl>
+              <Input
+  type="date"
+  name="startDate"
+  value={startDate ? startDate.toString().split('T')[0] : ''}
+  onChange={(e) => setStartDate(new Date(e.target.value))}
+/>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="startTime"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Event Time</FormLabel>
+              <FormControl>
+                <Input type="time" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="timezone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Timezone</FormLabel>
+              <FormControl>
+                <Input type="text" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="location"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Location</FormLabel>
+              <FormControl>
+                <Input type="text" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="meetingType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Meeting Type</FormLabel>
+              <FormControl>
+                <Input type="text" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+<Button
+  onClick={() => form.handleSubmit(onSubmit)()}
+  className="bg-primary-500"
+>
+  Post Event
+</Button>
+
       </form>
     </Form>
   );
-}
+};
 
 export default PostEvent;

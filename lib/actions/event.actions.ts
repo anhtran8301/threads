@@ -8,6 +8,19 @@ import User from "../models/user.model";
 import Community from "../models/community.model";
 import Event from "../models/event.model";
 
+interface Params {
+  eventName: string;
+  author: string; 
+  communityId: string;
+  startDate: Date;
+  startTime: string;
+  timezone: string;
+  meetingType: "Online" | "Offline";
+  location: string;
+  description: string;
+  path: string; 
+}
+
 export async function fetchEvents(pageNumber = 1, pageSize = 20) {
   connectToDB();
 
@@ -40,19 +53,6 @@ export async function fetchEvents(pageNumber = 1, pageSize = 20) {
   return { posts, isNext };
 }
 
-interface Params {
-  eventName: string;
-  author: string;
-  communityId: string;
-  startDate: Date;
-  startTime: string;
-  timezone: string;
-  meetingType: "Online" | "Offline";
-  location: string;
-  description: string;
-  path: string;
-}
-
 export async function createEvent({
   eventName,
   author,
@@ -68,53 +68,58 @@ export async function createEvent({
   try {
     connectToDB();
 
-    const communityIdObject = await Community.findOne(
-      { id: communityId },
-      { _id: 1 }
-    );
+    const community = await Community.findOne({ id: communityId });
+    if (!community) throw new Error("Community not found");
 
     const createdEvent = await Event.create({
       eventName,
       author,
+      community: community._id,
       startDate,
       startTime,
       timezone,
       meetingType,
       location,
       description,
-      community: communityIdObject,
     });
 
-    // Update User model
     await User.findByIdAndUpdate(author, {
-      $push: { threads: createdEvent._id },
+      $push: { event: createdEvent._id },
     });
 
-    if (communityIdObject) {
-      // Update Community model
-      await Community.findByIdAndUpdate(communityIdObject, {
-        $push: { threads: createdEvent._id },
-      });
-    }
+    await Community.findByIdAndUpdate(community._id, {
+      $push: { event: createdEvent._id },
+    });
 
-    revalidatePath(path);
+    revalidatePath(path); // Cập nhật lại trang
   } catch (error: any) {
     throw new Error(`Failed to create event: ${error.message}`);
   }
 }
 
-// async function fetchAllChildThreads(threadId: string): Promise<any[]> {
-//   const childThreads = await Event.find({ parentId: threadId });
 
-//   const descendantThreads = [];
-//   for (const childThread of childThreads) {
-//     const descendants = await fetchAllChildThreads(childThread._id);
-//     descendantThreads.push(childThread, ...descendants);
-//   }
+export async function updateEvent(
+  eventId: string,
+  updates: Partial<Params>,
+  path: string
+) {
+  try {
+    connectToDB();
 
-//   return descendantThreads;
-// }
+    const updatedEvent = await Event.findByIdAndUpdate(eventId, updates, {
+      new: true, // Return the updated document
+    });
 
+    if (!updatedEvent) {
+      throw new Error("Event not found");
+    }
+
+    revalidatePath(path);
+    return updatedEvent;
+  } catch (error: any) {
+    throw new Error(`Failed to update event: ${error.message}`);
+  }
+}
 export async function deleteThread(id: string, path: string): Promise<void> {
   try {
     connectToDB();
@@ -125,37 +130,6 @@ export async function deleteThread(id: string, path: string): Promise<void> {
     if (!mainThread) {
       throw new Error("Thread not found");
     }
-
-    // // Extract the authorIds and communityIds to update User and Community models respectively
-    // const uniqueAuthorIds = new Set(
-    //   [
-    //     ...descendantThreads.map((thread) => thread.author?._id?.toString()), // Use optional chaining to handle possible undefined values
-    //     mainThread.author?._id?.toString(),
-    //   ].filter((id) => id !== undefined)
-    // );
-
-    // const uniqueCommunityIds = new Set(
-    //   [
-    //     ...descendantThreads.map((thread) => thread.community?._id?.toString()), // Use optional chaining to handle possible undefined values
-    //     mainThread.community?._id?.toString(),
-    //   ].filter((id) => id !== undefined)
-    // );
-
-    // // Recursively delete child threads and their descendants
-    // await Event.deleteMany({ _id: { $in: descendantThreadIds } });
-
-    // // Update User model
-    // await User.updateMany(
-    //   { _id: { $in: Array.from(uniqueAuthorIds) } },
-    //   { $pull: { threads: { $in: descendantThreadIds } } }
-    // );
-
-    // // Update Community model
-    // await Community.updateMany(
-    //   { _id: { $in: Array.from(uniqueCommunityIds) } },
-    //   { $pull: { threads: { $in: descendantThreadIds } } }
-    // );
-
     revalidatePath(path);
   } catch (error: any) {
     throw new Error(`Failed to delete event: ${error.message}`);
